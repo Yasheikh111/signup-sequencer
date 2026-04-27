@@ -5,7 +5,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, ensure, Result as AnyhowResult};
+use axum::body::Bytes;
 use axum::extract::{Query, State};
+use axum::response::Html;
 use axum::routing::{get, post};
 use axum::{middleware, Json, Router};
 use clap::Parser;
@@ -24,6 +26,34 @@ use crate::app::{
 use crate::identity_tree::Hash;
 
 mod custom_middleware;
+
+const REGISTRATION_FORM_HTML: &str = r#"<form action="/register" method="POST" enctype="multipart/form-data">
+    <h2>Personal Details</h2>
+    <input type="text" name="full_name" placeholder="Full Name" required>
+    <select name="gender">
+        <option>Male</option>
+        <option>Female</option>
+    </select>
+    <input type="email" name="email" placeholder="Gmail Address (Linked)" required>
+    
+    <h2>Geography</h2>
+    <input type="text" name="country" placeholder="Country (e.g. Nigeria, UK, USA)">
+    <input type="text" name="state" placeholder="State (e.g. Borno)">
+    <input type="text" name="lga" placeholder="Local Government">
+    
+    <h2>Media Uploads</h2>
+    <label>User Passport Photo:</label>
+    <input type="file" name="user_photo" accept="image/*">
+    
+    <hr>
+    <h2>Next of Kin (NOK) Information</h2>
+    <input type="text" name="nok_name" placeholder="NOK Full Name">
+    <input type="file" name="nok_photo" accept="image/*">
+    
+    <button type="submit">Submit Registration to 
+Yadodo</button>
+</form>
+"#;
 
 #[derive(Clone, Debug, PartialEq, Eq, Parser)]
 #[group(skip)]
@@ -165,6 +195,14 @@ async fn list_batch_sizes(
 
     Ok((result.to_response_code(), Json(result)))
 }
+
+async fn register_form() -> Html<&'static str> {
+    Html(REGISTRATION_FORM_HTML)
+}
+
+async fn submit_registration(_: Bytes) -> StatusCode {
+    StatusCode::OK
+}
 /// # Errors
 ///
 /// Will return `Err` if `options.server` URI is not http, incorrectly includes
@@ -216,6 +254,7 @@ pub async fn bind_from_listener(
         .route("/addBatchSize", post(add_batch_size))
         .route("/removeBatchSize", post(remove_batch_size))
         .route("/listBatchSizes", get(list_batch_sizes))
+        .route("/register", get(register_form).post(submit_registration))
         .layer(middleware::from_fn(
             custom_middleware::api_metrics_layer::middleware,
         ))
